@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>メルカリPC利益チェッカー</title>
+<meta name="description" content="メルカリのゲーミングPCをドスパラ買取参考価格と比較して利益が出そうなものを表示します">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PC利益">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root { color-scheme: light dark;
+  --bg: #f4f5f7; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+  --accent: #2563eb; --plus: #15803d; --plus-bg: #dcfce7; --minus: #b91c1c; --minus-bg: #fee2e2;
+  --chip: #eef2ff; --chip-text: #3730a3; --warn: #92400e; --warn-bg: #fef3c7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1020; --card: #151b2e; --text: #e5e7eb; --muted: #9ca3af; --line: #263049;
+    --accent: #60a5fa; --plus: #4ade80; --plus-bg: #14321f; --minus: #f87171; --minus-bg: #3a1717;
+    --chip: #1e2547; --chip-text: #c7d2fe; --warn: #fcd34d; --warn-bg: #3a2e0e;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 15px; line-height: 1.5; -webkit-text-size-adjust: 100%;
+}
+header {
+  position: sticky; top: 0; z-index: 10; background: var(--card); border-bottom: 1px solid var(--line);
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+}
+h1 { font-size: 17px; margin: 0; }
+.meta { color: var(--muted); font-size: 12px; }
+.bar { display: flex; gap: 8px; margin-top: 8px; }
+.bar input, .bar select {
+  flex: 1; min-width: 0; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg); color: var(--text);
+}
+.bar button, .btn {
+  font-size: 14px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text);
+}
+details.settings { margin-top: 8px; }
+details.settings summary { color: var(--accent); font-size: 14px; cursor: pointer; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; margin-top: 8px; }
+.grid label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.grid input { width: 100%; min-width: 0; font-size: 15px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); margin-top: 8px; }
+main { padding: 12px 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 720px; margin: 0 auto; }
+.summary { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.card {
+  display: flex; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 10px; margin-bottom: 10px; color: inherit; text-decoration: none;
+}
+.card img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; flex-shrink: 0; background: var(--line); }
+.body { flex: 1; min-width: 0; }
+.name { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--chip); color: var(--chip-text); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.nums { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; gap: 8px; }
+.nums small { display: block; color: var(--muted); font-size: 11px; }
+.price { font-size: 14px; }
+.profit { font-weight: 700; font-size: 16px; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.profit.plus { color: var(--plus); background: var(--plus-bg); }
+.profit.minus { color: var(--minus); background: var(--minus-bg); }
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+.more { display: block; width: 100%; margin-top: 4px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>メルカリPC利益チェッカー</h1>
+  <div class="meta" id="meta">読み込み中…</div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="絞り込み（例: 4070, GALLERIA）" autocomplete="off">
+    <select id="sort" aria-label="並び順">
+      <option value="profit">利益順</option>
+      <option value="rate">利益率順</option>
+      <option value="new">新着順</option>
+      <option value="price">安い順</option>
+    </select>
+  </div>
+  <details class="settings">
+    <summary>計算条件</summary>
+    <div class="grid">
+      <label>最低利益（円）<input id="minProfit" type="number" inputmode="numeric" step="1000"></label>
+      <label>送料・手数料など（円）<input id="cost" type="number" inputmode="numeric" step="500"></label>
+      <label>GPU 査定率（%）<input id="gpuRate" type="number" inputmode="numeric" min="0" max="100"></label>
+      <label>CPU 査定率（%）<input id="cpuRate" type="number" inputmode="numeric" min="0" max="100"></label>
+      <label>その他パーツ（円）<input id="base" type="number" inputmode="numeric" step="1000"></label>
+      <label>価格上限（円）<input id="maxPrice" type="number" inputmode="numeric" step="10000" placeholder="なし"></label>
+    </div>
+    <label class="check"><input id="needCpu" type="checkbox"> CPUも判明したものだけ</label>
+    <button class="btn" id="reset" type="button" style="margin-top:8px">初期値に戻す</button>
+  </details>
+</header>
+<main>
+  <p class="summary" id="summary"></p>
+  <div id="list"></div>
+  <button class="btn more" id="more" type="button" hidden>もっと見る</button>
+  <p class="note">
+    推定買取額 ＝ GPU買取上限 × GPU査定率 ＋ CPU買取上限 × CPU査定率 ＋ その他パーツ。<br>
+    ドスパラの価格は「買取上限価格」（美品・付属品完備時）の型番ごとの中央値です。実際の査定はこれより下がることが多いので、購入前に必ずドスパラで見積もりを確認してください。
+  </p>
+</main>
+<script>
+const DEFAULTS = { minProfit: 0, cost: 0, gpuRate: 90, cpuRate: 90, base: 5000, maxPrice: "", needCpu: false, sort: "profit" };
+const KEY = "mercaripc-settings";
+const PAGE = 50;
+const CONDITIONS = { 1: "新品", 2: "未使用に近い", 3: "傷なし", 4: "やや傷", 5: "傷あり", 6: "状態悪い" };
+const yen = n => (n < 0 ? "-" : "") + "¥" + Math.abs(Math.round(n)).toLocaleString("ja-JP");
+const $ = id => document.getElementById(id);
+const fields = ["minProfit", "cost", "gpuRate", "cpuRate", "base", "maxPrice"];
+
+let data = null, shown = PAGE;
+let settings = { ...DEFAULTS };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+
+function save() { try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) {} }
+
+function fillForm() {
+  fields.forEach(f => $(f).value = settings[f]);
+  $("needCpu").checked = settings.needCpu;
+  $("sort").value = settings.sort;
+}
+
+function readForm() {
+  fields.forEach(f => {
+    const v = $(f).value;
+    settings[f] = v === "" ? (f === "maxPrice" ? "" : DEFAULTS[f]) : Number(v);
+  });
+  settings.needCpu = $("needCpu").checked;
+  settings.sort = $("sort").value;
+  save();
+}
+
+function compute(d) {
+  const gpu = d.gpu.price * settings.gpuRate / 100;
+  const cpu = d.cpu ? d.cpu.price * settings.cpuRate / 100 : 0;
+  const est = gpu + cpu + settings.base;
+  const profit = est - d.price - settings.cost;
+  return { ...d, est, profit, rate: profit / d.price };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function card(d) {
+  const chips = [`<span class="chip">${escapeHtml(d.gpu.key)} ${yen(d.gpu.price)}</span>`];
+  if (d.cpu) chips.push(`<span class="chip">${escapeHtml(d.cpu.key)} ${yen(d.cpu.price)}${d.cpu.approx ? "≈" : ""}</span>`);
+  else chips.push(`<span class="chip warn">CPU不明</span>`);
+  if (/パーツ|セット|一式|部品/.test(d.name)) chips.push(`<span class="chip warn">パーツ構成を確認</span>`);
+  if (d.multi_gpu) chips.push(`<span class="chip warn">GPU複数記載</span>`);
+  if (CONDITIONS[d.condition]) chips.push(`<span class="chip">${CONDITIONS[d.condition]}</span>`);
+  if (d.shipping_payer === 1) chips.push(`<span class="chip warn">着払い</span>`);
+  const cls = d.profit >= 0 ? "plus" : "minus";
+  return `<a class="card" href="https://jp.mercari.com/item/${encodeURIComponent(d.id)}" target="_blank" rel="noopener">
+    <img src="${escapeHtml(d.thumb)}" alt="" loading="lazy">
+    <div class="body">
+      <div class="name">${escapeHtml(d.name)}</div>
+      <div class="chips">${chips.join("")}</div>
+      <div class="nums">
+        <div class="price"><small>メルカリ価格 / 推定買取</small>${yen(d.price)} → ${yen(d.est)}</div>
+        <div class="profit ${cls}">${d.profit >= 0 ? "+" : ""}${yen(d.profit)}</div>
+      </div>
+    </div>
+  </a>`;
+}
+
+function render() {
+  if (!data) return;
+  const words = $("q").value.trim().toUpperCase().split(/\s+/).filter(Boolean);
+  let rows = data.deals.map(compute).filter(d =>
+    d.profit >= settings.minProfit &&
+    (settings.maxPrice === "" || d.price <= settings.maxPrice) &&
+    (!settings.needCpu || d.cpu) &&
+    words.every(w => (d.name + " " + d.gpu.key + " " + (d.cpu ? d.cpu.key : "")).toUpperCase().includes(w))
+  );
+  const sorters = {
+    profit: (a, b) => b.profit - a.profit,
+    rate: (a, b) => b.rate - a.rate,
+    new: (a, b) => (b.created || "").localeCompare(a.created || ""),
+    price: (a, b) => a.price - b.price,
+  };
+  rows.sort(sorters[settings.sort]);
+  $("summary").textContent = `条件に合う出品 ${rows.length} 件（全 ${data.deals.length} 件中）`;
+  $("list").innerHTML = rows.length
+    ? rows.slice(0, shown).map(card).join("")
+    : `<div class="empty">条件に合う出品はありません。<br>「計算条件」で最低利益を下げると候補が見られます。</div>`;
+  $("more").hidden = rows.length <= shown;
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+async function load() {
+  try {
+    const res = await fetch("data/deals.json?t=" + Date.now());
+    if (!res.ok) throw new Error(res.status);
+    data = await res.json();
+    $("meta").textContent = `メルカリ ${fmtDate(data.updated_at)} 更新 ・ ドスパラ価格 ${fmtDate(data.dospara_fetched_at)} 取得`;
+    render();
+  } catch (e) {
+    $("meta").textContent = "データを読み込めませんでした（" + e.message + "）";
+  }
+}
+
+fillForm();
+document.querySelectorAll("header input, header select").forEach(el =>
+  el.addEventListener("input", () => { shown = PAGE; if (el.id !== "q") readForm(); render(); }));
+$("reset").addEventListener("click", () => { settings = { ...DEFAULTS }; save(); fillForm(); render(); });
+$("more").addEventListener("click", () => { shown += PAGE; render(); });
+load();
+</script>
+</body>
+</html>
